@@ -1,28 +1,39 @@
 import express from "express";
 import multer from "multer";
-import path from "path";
+import cors from "cors";
 import fs from "fs";
+import path from "path";
+import crypto from "crypto";
 
 const app = express();
-const uploadDir = path.join(process.cwd(), "uploads");
+const PORT = process.env.PORT || 3000;
 
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
+app.use(cors());
+app.use(express.json());
 
+// 📁 Ensure upload folder exists
+if (!fs.existsSync("uploads")) fs.mkdirSync("uploads");
+
+// ⚙️ Multer setup — store with random names
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
+  destination: "uploads/",
   filename: (req, file, cb) => {
-    const uniqueName = Date.now() + "_" + file.originalname.replace(/\s+/g, "_");
-    cb(null, uniqueName);
+    const ext = path.extname(file.originalname);
+    const randomName = crypto.randomBytes(3).toString("hex"); // e.g., sop69y
+    cb(null, `${randomName}${ext}`);
   }
 });
 const upload = multer({ storage });
 
+// 🚀 Upload route
 app.post("/api/upload", upload.single("file"), (req, res) => {
-  const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+  if (!req.file) return res.status(400).json({ success: false, error: "No file uploaded" });
+
+  const fileUrl = `${req.protocol}://${req.get("host")}/${req.file.filename}`;
   res.json({ success: true, url: fileUrl });
 });
 
-app.use("/uploads", express.static(uploadDir));
+// 🌍 Serve uploaded files from root (like Catbox)
+app.use(express.static("uploads"));
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`✅ Upload API running on port ${PORT}`));
+app.listen(PORT, () => console.log(`✅ Catbox-style server running on port ${PORT}`));
